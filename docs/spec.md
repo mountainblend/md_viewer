@@ -28,7 +28,7 @@ app/md-viewer/
 | ファイル | 役割 |
 | --- | --- |
 | `types/file-system-access.d.ts` | TypeScript標準ライブラリに未収録のFile System Access API型（`showDirectoryPicker`、`queryPermission`/`requestPermission`、`FileSystemDirectoryHandle`の非同期イテレータ等）を補うアンビエント型定義 |
-| `lib/fsAccess.ts` | `pickFolder()`（フォルダ選択）、`verifyPermission()`（権限確認/要求）、`walkMarkdownFiles()`（`.md`ファイルの再帰列挙、`.`始まりのフォルダ・ファイルは除外）、`resolveRelativePath()`（Markdown内の相対パスをフォルダルートから解決） |
+| `lib/fsAccess.ts` | `pickFolder()`（フォルダ選択）、`verifyPermission()`（権限確認/要求）、`walkMarkdownFiles()`（`.md`ファイルの再帰列挙、`.`始まりのフォルダ・ファイルは除外）、`resolveRelativePath()`（Markdown内の相対パスをフォルダルートから解決）、`saveAttachment()`（画像をフォルダルート直下`attachments/`に保存し、同名衝突を避けつつ挿入用パスを返す） |
 | `lib/folderStore.ts` | 複数フォルダの選択履歴をIndexedDBで管理。`listFolders()` / `addFolder()` / `touchFolder()` / `removeFolder()` / `getActiveFolderId()` / `setActiveFolderId()` |
 | `lib/searchIndex.ts` | `buildContentCache()`（各ファイルの本文をバックグラウンドで並行読み込みしキャッシュ、`AbortSignal`で中断可能）、`searchEntries()`（ファイル名・キャッシュ済み本文を対象にした部分一致検索、スニペット生成） |
 | `lib/theme.ts` | ダークモードの状態取得・切り替え（`<html>`要素の`dark`クラスと`localStorage`を操作する`useTheme()`フック） |
@@ -36,7 +36,7 @@ app/md-viewer/
 | `components/FileTree.tsx` | フラットな`{path}[]`からフォルダ階層のツリーを構築・表示。フォルダは初期状態ですべて折りたたみ、クリックで開閉。フォルダ切り替え時は全フォルダを畳んだ状態にリセット |
 | `components/FolderPicker.tsx` | 選択履歴のあるフォルダ一覧＋追加/削除UI。フォルダ未選択時の全画面表示と、サイドバーのドロップダウン表示の2箇所で共用 |
 | `components/SearchPanel.tsx` | 検索ボックス（300msデバウンス）＋検索結果リスト（ファイル名＋本文スニペット、`<mark>`ハイライト）。クエリが空の時は`FileTree`をそのまま表示する |
-| `components/MarkdownEditor.tsx` | 選択中ファイルの閲覧・編集を担当。生テキスト（frontmatter込み）をテキストエリアで保持し、プレビューのみfrontmatterを除去して`react-markdown`で描画。画像（`img`）はカスタムレンダラーで相対パスを解決し`URL.createObjectURL()`で表示。表示モード（編集/両方/プレビュー）・分割比率・左右入替・スクロール同期・保存（`createWritable()`）を持つ。読み込み・保存した本文は`onContentLoaded`コールバックで検索キャッシュにも渡す |
+| `components/MarkdownEditor.tsx` | 選択中ファイルの閲覧・編集を担当。生テキスト（frontmatter込み）をテキストエリアで保持し、プレビューのみfrontmatterを除去して`react-markdown`で描画。画像（`img`）はカスタムレンダラーで相対パスを解決し`URL.createObjectURL()`で表示。表示モード（編集/両方/プレビュー）・分割比率・左右入替・スクロール同期・保存（`createWritable()`）・画像添付（`saveAttachment()`→カーソル位置に挿入）を持つ。読み込み・保存した本文は`onContentLoaded`コールバックで検索キャッシュにも渡す |
 | `app/page.tsx` | 全体を統合。初回マウント時にIndexedDBの選択履歴から直近フォルダをサイレントに復元。フォルダ切り替え・検索インデックス作成・ダークモード・サイドバーのリサイズ/表示切替を統括する |
 
 ## 5. 画面構成
@@ -100,13 +100,20 @@ app/md-viewer/
 - スクロール同期は、スクロール元の`(scrollTop) / (scrollHeight - clientHeight)`比率を計算し、相手側の同じ比率の位置へ反映する。`isSyncScrollingRef`で同期処理自体が再度スクロールイベントを発火させて無限ループになるのを防ぐ
 - 保存（`handleSave`）は`entry.handle.createWritable()`→`write(editedContent)`→`close()`。成功したら`savedContent`を更新し、`onContentLoaded`で検索キャッシュも最新化する。保存に失敗した場合は編集内容を保持したままエラーメッセージを表示する
 
-## 12. 既知の制約
+## 12. 画像添付
+
+- ツールバーの「画像を添付」→隠し`<input type="file" accept="image/*">`でファイル選択→`saveAttachment(rootHandle, file)`を呼ぶ
+- 保存先はフォルダルート直下の`attachments/`固定（編集中ファイルの場所によらず常に同じ場所）。同名ファイルが既にある場合は`name (1).ext`のように連番を付けて上書きを避ける
+- 挿入するMarkdownリンクはフォルダルート相対パス（例: `/attachments/image.png`）。`resolveRelativePath()`は先頭`/`をフォルダルート起点として解釈するため、編集中ファイルがどの階層にあってもプレビュー・保存後の再閲覧の両方で正しく画像が解決される
+- アップロード中はボタンを無効化し「アップロード中…」を表示。失敗時はエラーメッセージを表示する
+
+## 13. 既知の制約
 
 - File System Access APIはChrome・Edge等Chromium系ブラウザのみ対応。Firefox・Safariでは「フォルダを選択」ボタンの代わりに非対応の案内を表示する
-- 画像アップロード・認証機能は未実装（[要求仕様書 8章](requirements.md#8-スコープ外本アプリで対応しないこと)参照）
+- 認証機能は未実装（[要求仕様書 8章](requirements.md#8-スコープ外本アプリで対応しないこと)参照）
 - Obsidianの`[[wikilink]]`記法はプレビューで通常のテキストとして表示される（リンクとしては機能しない）
 - 自動テスト（Playwright等）は未導入。実装時の動作確認はPlaywrightによる手動起動スクリプトで実施した
 
-## 13. 開発・動作確認
+## 14. 開発・動作確認
 
 `nextjs_f/`で`npm run dev`（開発時）または`npm run build`（`output: "export"`による静的ビルド、`out/`に出力）。公開先は Vercel（`https://md-vault-viewer.vercel.app`）。

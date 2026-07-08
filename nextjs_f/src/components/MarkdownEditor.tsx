@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { resolveRelativePath, type FileEntry } from "@/lib/fsAccess";
+import {
+  resolveRelativePath,
+  saveAttachment,
+  type FileEntry,
+} from "@/lib/fsAccess";
 import { usePersistedState } from "@/lib/usePersistedState";
 
 const FRONTMATTER_PATTERN = /^---\r?\n[\s\S]*?\r?\n---\r?\n/;
@@ -37,6 +41,8 @@ export function MarkdownEditor({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = usePersistedState<ViewMode>(
     "viewMode",
@@ -57,6 +63,7 @@ export function MarkdownEditor({
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const isSyncScrollingRef = useRef(false);
   const draggingRatioRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // entry（表示中のファイル）が変わったら、前のファイルの内容を表示し続けないようリセットする
   // (レンダー中にstateを調整するReact推奨パターン: https://react.dev/learn/you-might-not-need-an-effect)
@@ -67,6 +74,7 @@ export function MarkdownEditor({
     setEditedContent("");
     setLoadError(null);
     setSaveError(null);
+    setUploadError(null);
   }
 
   const onContentLoadedRef = useRef(onContentLoaded);
@@ -131,6 +139,39 @@ export function MarkdownEditor({
       setSaveError("保存に失敗しました。");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const insertAtCursor = (text: string) => {
+    const el = textareaRef.current;
+    if (!el) {
+      setEditedContent((prev) => prev + text);
+      return;
+    }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    setEditedContent((prev) => prev.slice(0, start) + text + prev.slice(end));
+    requestAnimationFrame(() => {
+      el.focus();
+      el.selectionStart = el.selectionEnd = start + text.length;
+    });
+  };
+
+  const handleFileSelected = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const result = await saveAttachment(rootHandle, file);
+      insertAtCursor(`![${result.name}](${result.path})`);
+    } catch {
+      setUploadError("画像の添付に失敗しました。");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -235,6 +276,22 @@ export function MarkdownEditor({
           {isSaving ? "保存中…" : "保存"}
         </button>
 
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          className="rounded border border-neutral-200 px-3 py-1 text-sm hover:bg-black/5 disabled:opacity-40 dark:border-neutral-700 dark:hover:bg-white/10"
+        >
+          {isUploading ? "アップロード中…" : "画像を添付"}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={handleFileSelected}
+        />
+
         <div className="flex overflow-hidden rounded border border-neutral-200 dark:border-neutral-700">
           <button
             type="button"
@@ -292,6 +349,9 @@ export function MarkdownEditor({
           <span className="text-xs text-neutral-500">未保存の変更があります</span>
         )}
         {saveError && <span className="text-xs text-red-600">{saveError}</span>}
+        {uploadError && (
+          <span className="text-xs text-red-600">{uploadError}</span>
+        )}
       </div>
 
       <div ref={splitContainerRef} className="flex min-h-0 flex-1">

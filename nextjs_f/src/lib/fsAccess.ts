@@ -98,3 +98,57 @@ export async function resolveRelativePath(
     return null;
   }
 }
+
+const ATTACHMENTS_DIR_NAME = "attachments";
+
+function splitFileName(name: string): { base: string; ext: string } {
+  const dotIndex = name.lastIndexOf(".");
+  if (dotIndex <= 0) return { base: name, ext: "" };
+  return { base: name.slice(0, dotIndex), ext: name.slice(dotIndex) };
+}
+
+async function fileExists(
+  dir: FileSystemDirectoryHandle,
+  name: string
+): Promise<boolean> {
+  try {
+    await dir.getFileHandle(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 画像ファイルをフォルダルート直下のattachments/に保存する。
+ * 同名ファイルが既にある場合は "name (1).ext" のように連番を付けて衝突を避ける。
+ * 挿入用のMarkdownリンクにはフォルダルート相対パス（先頭"/"）を返す。
+ */
+export async function saveAttachment(
+  root: FileSystemDirectoryHandle,
+  file: File
+): Promise<{ name: string; path: string }> {
+  const attachmentsDir = await root.getDirectoryHandle(ATTACHMENTS_DIR_NAME, {
+    create: true,
+  });
+
+  // クライアントが指定したファイル名からディレクトリ指定を取り除き、ファイル名部分だけを使う
+  const rawName = file.name.split(/[/\\]/).pop() || "attachment";
+  const { base, ext } = splitFileName(rawName);
+
+  let candidate = rawName;
+  let counter = 1;
+  while (await fileExists(attachmentsDir, candidate)) {
+    candidate = `${base} (${counter})${ext}`;
+    counter += 1;
+  }
+
+  const handle = await attachmentsDir.getFileHandle(candidate, {
+    create: true,
+  });
+  const writable = await handle.createWritable();
+  await writable.write(file);
+  await writable.close();
+
+  return { name: candidate, path: `/${ATTACHMENTS_DIR_NAME}/${candidate}` };
+}
