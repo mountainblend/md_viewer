@@ -8,14 +8,14 @@ export function isFileSystemAccessSupported(): boolean {
 }
 
 export async function pickFolder(): Promise<FileSystemDirectoryHandle> {
-  return window.showDirectoryPicker({ mode: "read" });
+  return window.showDirectoryPicker({ mode: "readwrite" });
 }
 
 export async function verifyPermission(
   handle: FileSystemDirectoryHandle,
   requestIfNeeded: boolean
 ): Promise<boolean> {
-  const descriptor: FileSystemHandlePermissionDescriptor = { mode: "read" };
+  const descriptor: FileSystemHandlePermissionDescriptor = { mode: "readwrite" };
 
   if ((await handle.queryPermission(descriptor)) === "granted") {
     return true;

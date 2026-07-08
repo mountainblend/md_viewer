@@ -48,7 +48,8 @@ export function FolderPicker({
                   onClick={() => onRemove(folder.id)}
                   disabled={busy}
                   aria-label={`${folder.name}を一覧から削除`}
-                  className="shrink-0 rounded px-2 py-1.5 text-xs text-neutral-400 hover:bg-black/5 hover:text-neutral-700 disabled:opacity-50 dark:hover:bg-white/10 dark:hover:text-neutral-200"
+                  title="一覧から削除"
+                  className="shrink-0 rounded px-2 py-1.5 text-base leading-none text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-neutral-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
                 >
                   ×
                 </button>
@@ -63,7 +64,11 @@ export function FolderPicker({
         disabled={busy}
         className={
           isDropdown
-            ? "w-full rounded px-2 py-1.5 text-left text-sm text-neutral-600 hover:bg-black/5 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10"
+            ? `w-full rounded px-2 py-1.5 text-left text-sm text-neutral-600 hover:bg-black/5 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 ${
+                folders.length > 0
+                  ? "border-t border-neutral-200 pt-2 dark:border-neutral-700"
+                  : ""
+              }`
             : "rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900"
         }
       >

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileTree } from "@/components/FileTree";
 import { FolderPicker } from "@/components/FolderPicker";
-import { MarkdownViewer } from "@/components/MarkdownViewer";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { SearchPanel } from "@/components/SearchPanel";
 import {
   isFileSystemAccessSupported,
@@ -268,7 +268,7 @@ export default function Home() {
           <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
         )}
         <p className="mt-4 max-w-sm text-xs text-neutral-400">
-          選択したフォルダの内容はこの端末のブラウザ内だけで処理され、サーバーには送信されません。
+          選択したフォルダの内容は編集内容も含めこの端末のブラウザ内だけで処理され、サーバーには送信されません。
         </p>
       </CenteredMessage>
     );
@@ -281,7 +281,7 @@ export default function Home() {
       {!sidebarHidden && (
         <>
           <aside
-            className="flex shrink-0 flex-col overflow-hidden border-r border-neutral-200 p-2 dark:border-neutral-800"
+            className="flex shrink-0 flex-col border-r border-neutral-200 p-2 dark:border-neutral-800"
             style={{ width: sidebarWidth }}
           >
             <div className="mb-2 flex items-center justify-between px-1 py-1">
@@ -329,20 +329,22 @@ export default function Home() {
               </div>
             </div>
 
-            <SearchPanel
-              entries={entries}
-              contentCache={contentCache}
-              indexing={indexing}
-              selectedPath={selectedPath}
-              onSelect={setSelectedPath}
-              treeFallback={
-                <FileTree
-                  entries={entries}
-                  selectedPath={selectedPath}
-                  onSelect={setSelectedPath}
-                />
-              }
-            />
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <SearchPanel
+                entries={entries}
+                contentCache={contentCache}
+                indexing={indexing}
+                selectedPath={selectedPath}
+                onSelect={setSelectedPath}
+                treeFallback={
+                  <FileTree
+                    entries={entries}
+                    selectedPath={selectedPath}
+                    onSelect={setSelectedPath}
+                  />
+                }
+              />
+            </div>
           </aside>
           <div
             role="separator"
@@ -354,7 +356,7 @@ export default function Home() {
           />
         </>
       )}
-      <main className="relative flex-1 overflow-y-auto">
+      <main className="relative flex flex-1 flex-col overflow-hidden">
         {sidebarHidden && (
           <button
             type="button"
@@ -366,7 +368,7 @@ export default function Home() {
           </button>
         )}
         {selectedEntry ? (
-          <MarkdownViewer
+          <MarkdownEditor
             rootHandle={rootHandle}
             entry={selectedEntry}
             onContentLoaded={handleContentLoaded}
