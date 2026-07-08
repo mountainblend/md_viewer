@@ -18,7 +18,7 @@
 | --- | --- |
 | クラウド版 | 既存の`app/md-vault`。要認証、フロントエンド＋バックエンド構成 |
 | ローカル専用版 | 既存の`app/md-vault_webr`。localhost限定・認証なしで自宅PC内のみ完結 |
-| File System Access API | ブラウザ上でユーザーが明示的に許可したローカルフォルダ・ファイルに直接アクセスできるWeb標準API。Chrome/Edge等Chromium系ブラウザのみ対応 |
+| File System Access API | ブラウザ上でユーザーが明示的に許可したローカルフォルダ・ファイルに直接アクセスできるWeb標準API。パソコン版のChrome/Edge等Chromium系ブラウザのみ対応（スマートフォン・タブレットはChromeであっても非対応） |
 
 ## 4. 想定利用者・利用シーン
 
@@ -62,7 +62,7 @@
 
 ## 7. 制約条件
 
-- File System Access APIはChrome・Edge等Chromium系ブラウザのみ対応。Firefox・Safari（iPhoneのSafariを含む）では利用できない
+- File System Access APIはパソコン版のChrome・Edge等Chromium系ブラウザのみ対応。Firefox・Safariでは利用できず、スマートフォン・タブレット（iOS/Android）は使用ブラウザによらず（Chromeであっても）利用できない
 - バックエンドを持たない静的サイトとして構成する（サーバーサイドの処理を必要としない）
 
 ## 8. スコープ外（本アプリで対応しないこと）

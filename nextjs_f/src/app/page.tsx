@@ -245,7 +245,10 @@ export default function Home() {
       <CenteredMessage>
         <p>このブラウザは File System Access API に対応していません。</p>
         <p className="mt-1">
-          Google Chrome または Microsoft Edge の最新版でお試しください。
+          パソコン（Windows / Mac）版の Google Chrome または Microsoft Edge の最新版でお試しください。
+        </p>
+        <p className="mt-1 text-xs text-neutral-400">
+          スマートフォン・タブレット（iOS / Android）は、Chromeであってもこの機能に対応していません。
         </p>
       </CenteredMessage>
     );

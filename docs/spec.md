@@ -109,7 +109,7 @@ app/md-viewer/
 
 ## 13. 既知の制約
 
-- File System Access APIはChrome・Edge等Chromium系ブラウザのみ対応。Firefox・Safariでは「フォルダを選択」ボタンの代わりに非対応の案内を表示する
+- File System Access APIはパソコン版のChrome・Edge等Chromium系ブラウザのみ対応。Firefox・Safari、およびスマートフォン・タブレット（iOS/Android。Chromeであっても非対応）では「フォルダを選択」ボタンの代わりに非対応の案内を表示する
 - 認証機能は未実装（[要求仕様書 8章](requirements.md#8-スコープ外本アプリで対応しないこと)参照）
 - Obsidianの`[[wikilink]]`記法はプレビューで通常のテキストとして表示される（リンクとしては機能しない）
 - 自動テスト（Playwright等）は未導入。実装時の動作確認はPlaywrightによる手動起動スクリプトで実施した
