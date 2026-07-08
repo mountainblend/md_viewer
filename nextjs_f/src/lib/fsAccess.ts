@@ -1,4 +1,4 @@
-export interface VaultFileEntry {
+export interface FileEntry {
   path: string;
   handle: FileSystemFileHandle;
 }
@@ -7,7 +7,7 @@ export function isFileSystemAccessSupported(): boolean {
   return typeof window !== "undefined" && "showDirectoryPicker" in window;
 }
 
-export async function pickVaultDirectory(): Promise<FileSystemDirectoryHandle> {
+export async function pickFolder(): Promise<FileSystemDirectoryHandle> {
   return window.showDirectoryPicker({ mode: "read" });
 }
 
@@ -30,7 +30,7 @@ async function walk(
   root: FileSystemDirectoryHandle,
   dir: FileSystemDirectoryHandle,
   prefix: string,
-  out: VaultFileEntry[]
+  out: FileEntry[]
 ): Promise<void> {
   for await (const [name, handle] of dir.entries()) {
     if (name.startsWith(".")) continue;
@@ -47,8 +47,8 @@ async function walk(
 
 export async function walkMarkdownFiles(
   root: FileSystemDirectoryHandle
-): Promise<VaultFileEntry[]> {
-  const out: VaultFileEntry[] = [];
+): Promise<FileEntry[]> {
+  const out: FileEntry[] = [];
   await walk(root, root, "", out);
   return out;
 }
@@ -58,7 +58,7 @@ function isAbsoluteUrl(src: string): boolean {
 }
 
 /**
- * Markdown内の相対パス（画像リンク等）を、参照元ファイルのパスを基点にVaultルートからたどって解決する。
+ * Markdown内の相対パス（画像リンク等）を、参照元ファイルのパスを基点にフォルダルートからたどって解決する。
  * 絶対URL・データURLはnullを返し、呼び出し側でそのまま使わせる。
  */
 export async function resolveRelativePath(
@@ -71,8 +71,8 @@ export async function resolveRelativePath(
   }
 
   const decoded = decodeURIComponent(relativePath);
-  const isVaultRoot = decoded.startsWith("/");
-  const baseSegments = isVaultRoot ? [] : basePath.split("/").slice(0, -1);
+  const isFolderRoot = decoded.startsWith("/");
+  const baseSegments = isFolderRoot ? [] : basePath.split("/").slice(0, -1);
   const relSegments = decoded.split("/").filter((s) => s.length > 0);
 
   const segments = [...baseSegments];

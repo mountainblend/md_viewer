@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { resolveRelativePath, type VaultFileEntry } from "@/lib/fsAccess";
+import { resolveRelativePath, type FileEntry } from "@/lib/fsAccess";
 
 const FRONTMATTER_PATTERN = /^---\r?\n[\s\S]*?\r?\n---\r?\n/;
 
 interface MarkdownViewerProps {
   rootHandle: FileSystemDirectoryHandle;
-  entry: VaultFileEntry;
+  entry: FileEntry;
+  onContentLoaded?: (path: string, content: string) => void;
 }
 
-export function MarkdownViewer({ rootHandle, entry }: MarkdownViewerProps) {
+export function MarkdownViewer({
+  rootHandle,
+  entry,
+  onContentLoaded,
+}: MarkdownViewerProps) {
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +30,11 @@ export function MarkdownViewer({ rootHandle, entry }: MarkdownViewerProps) {
     setError(null);
   }
 
+  const onContentLoadedRef = useRef(onContentLoaded);
+  useEffect(() => {
+    onContentLoadedRef.current = onContentLoaded;
+  }, [onContentLoaded]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -32,7 +42,10 @@ export function MarkdownViewer({ rootHandle, entry }: MarkdownViewerProps) {
       .getFile()
       .then((file) => file.text())
       .then((text) => {
-        if (!cancelled) setContent(text);
+        if (!cancelled) {
+          setContent(text);
+          onContentLoadedRef.current?.(entry.path, text);
+        }
       })
       .catch(() => {
         if (!cancelled) setError("ファイルの読み込みに失敗しました。");

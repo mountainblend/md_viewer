@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { VaultFileEntry } from "@/lib/fsAccess";
+import type { FileEntry } from "@/lib/fsAccess";
 
 interface TreeNode {
   name: string;
@@ -10,7 +10,7 @@ interface TreeNode {
   children: TreeNode[];
 }
 
-function buildTree(entries: VaultFileEntry[]): TreeNode[] {
+function buildTree(entries: FileEntry[]): TreeNode[] {
   const root: TreeNode[] = [];
 
   for (const entry of entries) {
@@ -55,7 +55,7 @@ function collectFolderPaths(nodes: TreeNode[], out: string[] = []): string[] {
 }
 
 interface FileTreeProps {
-  entries: VaultFileEntry[];
+  entries: FileEntry[];
   selectedPath: string | null;
   onSelect: (path: string) => void;
 }
