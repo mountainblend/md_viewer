@@ -70,7 +70,9 @@ app/md-viewer/
 - DB名`md-vault-viewer`、`DB_VERSION 2`。object store `folders`（`keyPath: "id"`、`{ id, name, handle, lastOpenedAt }`）と`meta`（キーバリュー、`activeFolderId`を保持）を持つ
 - ページ読み込み時、選択履歴の中から`activeFolderId`（無ければ最も新しく開いたフォルダ）を`queryPermission()`でサイレントに権限確認する。ブラウザの仕様上、ユーザー操作を伴わない`requestPermission()`は許可ダイアログを表示できないため、未許可の場合は改めてフォルダ選択画面を表示する
 - サイドバーのフォルダ名クリック、または未選択時の画面から、選択履歴にある他のフォルダへ切り替えられる（クリックはユーザー操作扱いのため`requestPermission()`で許可ダイアログを表示できる）
-- 履歴からの削除はIndexedDB上の記録を消すのみで、実フォルダやその中身には一切影響しない
+- 履歴からの削除（手動の「×」・自動削除とも）はIndexedDB上の記録を消すのみで、実フォルダやその中身には一切影響しない
+- 選択履歴は最大3件まで（`MAX_FOLDERS`）。上限を超えて追加すると、直近追加分を除いて`lastOpenedAt`が最も古いものから自動的に削除される（LRU）
+- 30日間（`STALE_MS`）開かれていないフォルダは、`listFolders()`呼び出し時（起動時・一覧更新時）に自動的に削除される。削除されるのは履歴の記録のみで、実フォルダには影響しない
 
 ## 8. 検索の仕組み
 
