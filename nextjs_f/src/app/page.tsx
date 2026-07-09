@@ -6,6 +6,7 @@ import { FolderPicker } from "@/components/FolderPicker";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { SearchPanel } from "@/components/SearchPanel";
 import {
+  createMarkdownFile,
   isFileSystemAccessSupported,
   pickFolder,
   verifyPermission,
@@ -45,6 +46,12 @@ export default function Home() {
   const [pickerBusy, setPickerBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+
+  const [isCreatingFile, setIsCreatingFile] = useState(false);
+  const [newFileName, setNewFileName] = useState("");
+  const [createFileError, setCreateFileError] = useState<string | null>(null);
+  const [isCreatingFileBusy, setIsCreatingFileBusy] = useState(false);
+  const newFileInputRef = useRef<HTMLInputElement>(null);
 
   const [isDark, toggleTheme] = useTheme();
   const [sidebarWidth, setSidebarWidth] = usePersistedState(
@@ -220,6 +227,38 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    if (isCreatingFile) {
+      newFileInputRef.current?.focus();
+    }
+  }, [isCreatingFile]);
+
+  const closeCreateFile = () => {
+    setIsCreatingFile(false);
+    setNewFileName("");
+    setCreateFileError(null);
+  };
+
+  const handleCreateFile = async () => {
+    if (!rootHandle) return;
+    setIsCreatingFileBusy(true);
+    setCreateFileError(null);
+    try {
+      const handle = await createMarkdownFile(rootHandle, newFileName);
+      const files = await walkMarkdownFiles(rootHandle);
+      files.sort((a, b) => a.path.localeCompare(b.path, "ja"));
+      setEntries(files);
+      setSelectedPath(handle.name);
+      closeCreateFile();
+    } catch (err) {
+      setCreateFileError(
+        err instanceof Error ? err.message : "作成に失敗しました。"
+      );
+    } finally {
+      setIsCreatingFileBusy(false);
+    }
+  };
+
   const handleDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
     draggingRef.current = true;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -284,7 +323,7 @@ export default function Home() {
       {!sidebarHidden && (
         <>
           <aside
-            className="flex shrink-0 flex-col border-r border-neutral-200 p-2 dark:border-neutral-800"
+            className="print:hidden flex shrink-0 flex-col border-r border-neutral-200 p-2 dark:border-neutral-800"
             style={{ width: sidebarWidth }}
           >
             <div className="mb-2 flex items-center justify-between px-1 py-1">
@@ -315,6 +354,18 @@ export default function Home() {
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
+                  onClick={() => {
+                    setCreateFileError(null);
+                    setIsCreatingFile(true);
+                  }}
+                  aria-label="新規ファイル作成"
+                  title="新規ファイル作成"
+                  className="rounded px-1.5 py-0.5 text-xs text-neutral-500 hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  ＋
+                </button>
+                <button
+                  type="button"
                   onClick={toggleTheme}
                   aria-label="ダークモード切り替え"
                   className="rounded px-1.5 py-0.5 text-xs text-neutral-500 hover:bg-black/5 dark:hover:bg-white/10"
@@ -331,6 +382,45 @@ export default function Home() {
                 </button>
               </div>
             </div>
+
+            {isCreatingFile && (
+              <div className="mb-2 px-1">
+                <input
+                  ref={newFileInputRef}
+                  type="text"
+                  value={newFileName}
+                  onChange={(e) => setNewFileName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateFile();
+                    if (e.key === "Escape") closeCreateFile();
+                  }}
+                  disabled={isCreatingFileBusy}
+                  placeholder="新しいファイル名（.md）"
+                  className="w-full rounded border border-neutral-300 bg-transparent px-2 py-1 text-sm outline-none focus:border-neutral-500 disabled:opacity-50 dark:border-neutral-700"
+                />
+                <div className="mt-1 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCreateFile}
+                    disabled={isCreatingFileBusy}
+                    className="rounded bg-neutral-900 px-2 py-0.5 text-xs text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900"
+                  >
+                    {isCreatingFileBusy ? "作成中…" : "作成"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeCreateFile}
+                    disabled={isCreatingFileBusy}
+                    className="rounded px-2 py-0.5 text-xs text-neutral-500 hover:bg-black/5 disabled:opacity-40 dark:hover:bg-white/10"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+                {createFileError && (
+                  <p className="mt-1 text-xs text-red-600">{createFileError}</p>
+                )}
+              </div>
+            )}
 
             <div className="min-h-0 flex-1 overflow-hidden">
               <SearchPanel
@@ -355,7 +445,7 @@ export default function Home() {
             onPointerDown={handleDragStart}
             onPointerMove={handleDragMove}
             onPointerUp={handleDragEnd}
-            className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-neutral-300 dark:hover:bg-neutral-700"
+            className="print:hidden w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-neutral-300 dark:hover:bg-neutral-700"
           />
         </>
       )}
@@ -365,7 +455,7 @@ export default function Home() {
             type="button"
             onClick={() => setSidebarHidden(false)}
             aria-label="サイドバーを表示"
-            className="absolute left-2 top-2 z-10 rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+            className="print:hidden absolute left-2 top-2 z-10 rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
           >
             »
           </button>

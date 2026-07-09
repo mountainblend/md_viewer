@@ -20,6 +20,9 @@ app/md-viewer/
 
 - Next.js（TypeScript, App Router）/ Tailwind CSS v4
 - Markdownレンダリング: `react-markdown` + `remark-gfm`（既存2アプリと同じ構成）
+- Mermaid図: `mermaid`（クライアント側で動的import、SVGを描画）
+- 数式: `remark-math` + `rehype-katex` + `katex`
+- 生HTML埋め込み: `rehype-raw` + `rehype-sanitize`（安全なタグ・属性のみ許可）
 - ローカルファイルアクセス: ブラウザ標準の File System Access API（追加ライブラリなし）
 - フォルダ選択履歴・設定の永続化: 生のIndexedDB API・`localStorage`（追加ライブラリなし）
 
@@ -28,7 +31,8 @@ app/md-viewer/
 | ファイル | 役割 |
 | --- | --- |
 | `types/file-system-access.d.ts` | TypeScript標準ライブラリに未収録のFile System Access API型（`showDirectoryPicker`、`queryPermission`/`requestPermission`、`FileSystemDirectoryHandle`の非同期イテレータ等）を補うアンビエント型定義 |
-| `lib/fsAccess.ts` | `pickFolder()`（フォルダ選択）、`verifyPermission()`（権限確認/要求）、`walkMarkdownFiles()`（`.md`ファイルの再帰列挙、`.`始まりのフォルダ・ファイルは除外）、`resolveRelativePath()`（Markdown内の相対パスをフォルダルートから解決）、`saveAttachment()`（画像をフォルダルート直下`attachments/`に保存し、同名衝突を避けつつ挿入用パスを返す） |
+| `lib/fsAccess.ts` | `pickFolder()`（フォルダ選択）、`verifyPermission()`（権限確認/要求）、`walkMarkdownFiles()`（`.md`ファイルの再帰列挙、`.`始まりのフォルダ・ファイルは除外）、`resolveRelativePath()`（Markdown内の相対パスをフォルダルートから解決）、`saveAttachment()`（画像をフォルダルート直下`attachments/`に保存し、同名衝突を避けつつ挿入用パスを返す）、`createMarkdownFile()`（フォルダルート直下に新規`.md`ファイルを作成） |
+| `lib/sanitizeSchema.ts` | `rehype-sanitize`用のカスタムスキーマ。既定スキーマ（GitHub準拠）をベースに`style`・`className`属性を全要素で許可する |
 | `lib/folderStore.ts` | 複数フォルダの選択履歴をIndexedDBで管理。`listFolders()` / `addFolder()` / `touchFolder()` / `removeFolder()` / `getActiveFolderId()` / `setActiveFolderId()` |
 | `lib/searchIndex.ts` | `buildContentCache()`（各ファイルの本文をバックグラウンドで並行読み込みしキャッシュ、`AbortSignal`で中断可能）、`searchEntries()`（ファイル名・キャッシュ済み本文を対象にした部分一致検索、スニペット生成） |
 | `lib/theme.ts` | ダークモードの状態取得・切り替え（`<html>`要素の`dark`クラスと`localStorage`を操作する`useTheme()`フック） |
@@ -36,7 +40,8 @@ app/md-viewer/
 | `components/FileTree.tsx` | フラットな`{path}[]`からフォルダ階層のツリーを構築・表示。フォルダは初期状態ですべて折りたたみ、クリックで開閉。フォルダ切り替え時は全フォルダを畳んだ状態にリセット |
 | `components/FolderPicker.tsx` | 選択履歴のあるフォルダ一覧＋追加/削除UI。フォルダ未選択時の全画面表示と、サイドバーのドロップダウン表示の2箇所で共用 |
 | `components/SearchPanel.tsx` | 検索ボックス（300msデバウンス）＋検索結果リスト（ファイル名＋本文スニペット、`<mark>`ハイライト）。クエリが空の時は`FileTree`をそのまま表示する |
-| `components/MarkdownEditor.tsx` | 選択中ファイルの閲覧・編集を担当。生テキスト（frontmatter込み）をテキストエリアで保持し、プレビューのみfrontmatterを除去して`react-markdown`で描画。画像（`img`）はカスタムレンダラーで相対パスを解決し`URL.createObjectURL()`で表示。表示モード（編集/両方/プレビュー）・分割比率・左右入替・スクロール同期・保存（`createWritable()`）・画像添付（`saveAttachment()`→カーソル位置に挿入）を持つ。読み込み・保存した本文は`onContentLoaded`コールバックで検索キャッシュにも渡す |
+| `components/MarkdownEditor.tsx` | 選択中ファイルの閲覧・編集を担当。生テキスト（frontmatter込み）をテキストエリアで保持し、プレビューのみfrontmatterを除去して`react-markdown`で描画（Mermaid・数式・生HTML対応込み）。画像（`img`）はカスタムレンダラーで相対パスを解決し`URL.createObjectURL()`で表示。表示モード（編集/両方/プレビュー）・分割比率・左右入替・スクロール同期・保存（`createWritable()`）・画像添付（`saveAttachment()`→カーソル位置に挿入）・PDF出力（`window.print()`）を持つ。読み込み・保存した本文は`onContentLoaded`コールバックで検索キャッシュにも渡す |
+| `components/MermaidDiagram.tsx` | フェンスコードブロックが`mermaid`言語の場合に描画される専用コンポーネント。`mermaid`パッケージを動的importし、`mermaid.render()`が返すSVG文字列をコンテナに挿入する |
 | `app/page.tsx` | 全体を統合。初回マウント時にIndexedDBの選択履歴から直近フォルダをサイレントに復元。フォルダ切り替え・検索インデックス作成・ダークモード・サイドバーのリサイズ/表示切替を統括する |
 
 ## 5. 画面構成
@@ -107,13 +112,46 @@ app/md-viewer/
 - 挿入するMarkdownリンクはフォルダルート相対パス（例: `/attachments/image.png`）。`resolveRelativePath()`は先頭`/`をフォルダルート起点として解釈するため、編集中ファイルがどの階層にあってもプレビュー・保存後の再閲覧の両方で正しく画像が解決される
 - アップロード中はボタンを無効化し「アップロード中…」を表示。失敗時はエラーメッセージを表示する
 
-## 13. 既知の制約
+## 13. 新規ファイル作成
+
+- サイドバーヘッダーの「＋」ボタン→インラインのファイル名入力欄を表示→`createMarkdownFile(rootHandle, name)`を呼ぶ
+- ファイル名の空文字・`/`や`\`を含む・`.`始まりはエラーにする。`.md`で終わっていなければ自動付与し、同名ファイルが既にある場合もエラーにする（`lib/fsAccess.ts`の`fileExists()`ヘルパーを`saveAttachment()`と共用）
+- 作成に成功したら`walkMarkdownFiles()`でファイル一覧を再取得し、作成したファイルを選択状態にして`MarkdownEditor`を開く
+
+## 14. Mermaid図
+
+- `MarkdownEditor`のReactMarkdown `components`で`code`・`pre`をオーバーライドし、フェンスコードブロックの言語が`mermaid`（`className`が`language-mermaid`）の場合は`<MermaidDiagram>`に置き換える（`pre`側でも同条件を検出し、`<pre>`タグでのラップを避けて`MermaidDiagram`をそのまま返す）
+- `MermaidDiagram`はクライアント専用。`useEffect`内で`mermaid`パッケージを動的import（初期バンドル肥大化を避けるため）し、`mermaid.initialize()`→`mermaid.render(id, code)`で得たSVG文字列をコンテナへ`innerHTML`として挿入する
+- `<html>`の`dark`クラスの有無に応じて`theme: "dark" | "default"`を渡す。構文エラー時は例外をcatchしてエラーメッセージを表示する
+
+## 15. 数式（KaTeX）
+
+- `remarkPlugins`に`remarkMath`を追加し、`$...$`（インライン）・`$$...$$`（ブロック）記法を解析する
+- `rehypePlugins`に`rehypeKatex`を追加し、実際の数式描画を行う。`katex/dist/katex.min.css`を`globals.css`で読み込む
+
+## 16. 生HTML埋め込み・サニタイズ
+
+- `rehypePlugins`に`rehypeRaw`（Markdown中の生HTMLをhastツリーに変換）と`[rehypeSanitize, markdownSanitizeSchema]`（危険な要素・属性の除去）を、`rehypeKatex`より前に配置する
+- `lib/sanitizeSchema.ts`の`markdownSanitizeSchema`は`rehype-sanitize`の既定スキーマ（GitHubのMarkdownサニタイズ準拠。`<script>`・`on*`イベントハンドラ・`javascript:`スキーム等は除去される）をベースに、`style`・`className`属性をすべての要素で許可するよう拡張したもの。これにより`<details><summary>`や`style="page-break-before: always"`によるPDF改ページ指定が利用できる
+- `rehypeKatex`はサニタイズより後段で実行されるため、KaTeXが生成するHTML自体はサニタイズの影響を受けない
+
+## 17. PDF出力
+
+ユーザーが画面上で選んでいる表示モード（編集のみ/両方/プレビューのみ）のまま印刷・PDF化できるようにする（常にプレビューのみをPDF化するのではない）。
+
+- ツールバーの「PDF出力」ボタンは`window.print()`を呼ぶだけで、ブラウザの印刷ダイアログ（「PDFとして保存」）に処理を委ねる。新規ライブラリは追加していない
+- サイドバー・ツールバー・分割ドラッグハンドルなど操作用UIには`print:hidden`（Tailwindの印刷用ユーティリティ）を付与し、印刷時は非表示にする
+- `<textarea>`は印刷時に内容が正しく展開されないブラウザがあるため、`<textarea>`自体に`print:hidden`を付け、代わりに同一内容・同一幅の`<pre className="hidden print:block ...">`を印刷専用として並べて配置する（画面上は常に非表示、印刷時のみ表示）。「編集のみ」「両方」モードではこの`<pre>`が編集内容を表す
+- プレビュー側（`previewPane`）は通常のHTML要素なのでそのまま印刷に使われる
+- `globals.css`の`@media print`ブロックで、画面用に固定していた`overflow`/`height`を`.markdown-editor-root`・`.markdown-editor-split`・`main`等に対して解除し、印刷時に内容が途切れないようにする
+
+## 18. 既知の制約
 
 - File System Access APIはパソコン版のChrome・Edge等Chromium系ブラウザのみ対応。Firefox・Safari、およびスマートフォン・タブレット（iOS/Android。Chromeであっても非対応）では「フォルダを選択」ボタンの代わりに非対応の案内を表示する
 - 認証機能は未実装（[要求仕様書 8章](requirements.md#8-スコープ外本アプリで対応しないこと)参照）
 - Obsidianの`[[wikilink]]`記法はプレビューで通常のテキストとして表示される（リンクとしては機能しない）
 - 自動テスト（Playwright等）は未導入。実装時の動作確認はPlaywrightによる手動起動スクリプトで実施した
 
-## 14. 開発・動作確認
+## 19. 開発・動作確認
 
 `nextjs_f/`で`npm run dev`（開発時）または`npm run build`（`output: "export"`による静的ビルド、`out/`に出力）。公開先は Vercel（`https://md-vault-viewer.vercel.app`）。

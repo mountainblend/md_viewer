@@ -152,3 +152,34 @@ export async function saveAttachment(
 
   return { name: candidate, path: `/${ATTACHMENTS_DIR_NAME}/${candidate}` };
 }
+
+/**
+ * フォルダルート直下に新しいMarkdownファイルを作成する。
+ * 空文字・区切り文字を含む名前・ドット始まりの名前はエラーにする。
+ * ".md"で終わっていなければ自動的に付与する。同名ファイルが既にある場合もエラーにする。
+ */
+export async function createMarkdownFile(
+  root: FileSystemDirectoryHandle,
+  rawName: string
+): Promise<FileSystemFileHandle> {
+  const trimmed = rawName.trim();
+  if (!trimmed) {
+    throw new Error("ファイル名を入力してください。");
+  }
+  if (trimmed.includes("/") || trimmed.includes("\\")) {
+    throw new Error("ファイル名にフォルダ区切り文字は使えません。");
+  }
+  if (trimmed.startsWith(".")) {
+    throw new Error("ドットで始まるファイル名は使えません。");
+  }
+
+  const name = trimmed.toLowerCase().endsWith(".md")
+    ? trimmed
+    : `${trimmed}.md`;
+
+  if (await fileExists(root, name)) {
+    throw new Error("同名のファイルが既に存在します。");
+  }
+
+  return root.getFileHandle(name, { create: true });
+}

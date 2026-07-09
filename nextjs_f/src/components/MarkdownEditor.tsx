@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import {
   resolveRelativePath,
   saveAttachment,
   type FileEntry,
 } from "@/lib/fsAccess";
+import { markdownSanitizeSchema } from "@/lib/sanitizeSchema";
 import { usePersistedState } from "@/lib/usePersistedState";
+import { MermaidDiagram } from "@/components/MermaidDiagram";
 
 const FRONTMATTER_PATTERN = /^---\r?\n[\s\S]*?\r?\n---\r?\n/;
 
@@ -122,6 +128,26 @@ export function MarkdownEditor({
           alt={alt}
         />
       ),
+      code: (props) => {
+        const { className, children } = props;
+        const languageMatch = /language-(\w+)/.exec(className ?? "");
+        if (languageMatch?.[1] === "mermaid") {
+          return (
+            <MermaidDiagram code={String(children).replace(/\n$/, "")} />
+          );
+        }
+        return <code className={className}>{children}</code>;
+      },
+      pre: ({ children }) => {
+        const child = Array.isArray(children) ? children[0] : children;
+        if (
+          isValidElement<{ className?: string }>(child) &&
+          child.props.className?.includes("language-mermaid")
+        ) {
+          return <>{child}</>;
+        }
+        return <pre>{children}</pre>;
+      },
     }),
     [rootHandle, entry.path]
   );
@@ -219,6 +245,13 @@ export function MarkdownEditor({
     return <p className="p-6 text-sm text-neutral-400">読み込み中...</p>;
   }
 
+  const paneWidthStyle =
+    viewMode === "both" ? { width: `${editorRatio * 100}%` } : undefined;
+  const previewWidthStyle =
+    viewMode === "both"
+      ? { width: `${(1 - editorRatio) * 100}%` }
+      : undefined;
+
   const editorPane = (
     <textarea
       key="editor"
@@ -227,11 +260,25 @@ export function MarkdownEditor({
       onChange={(e) => setEditedContent(e.target.value)}
       onScroll={handleEditorScroll}
       spellCheck={false}
-      style={viewMode === "both" ? { width: `${editorRatio * 100}%` } : undefined}
-      className={`resize-none overflow-y-auto p-4 font-mono text-sm outline-none ${
+      style={paneWidthStyle}
+      className={`print:hidden resize-none overflow-y-auto p-4 font-mono text-sm outline-none ${
         viewMode === "edit" ? "w-full" : ""
       }`}
     />
+  );
+
+  // <textarea>は印刷時に中身が正しく展開されないブラウザがあるため、
+  // 印刷時だけ同じ内容・同じ幅の<pre>に差し替えて表示する（画面上は常にhidden）
+  const printEditorPane = (
+    <pre
+      key="print-editor"
+      style={paneWidthStyle}
+      className={`hidden print:block whitespace-pre-wrap p-4 font-mono text-sm ${
+        viewMode === "edit" ? "w-full" : ""
+      }`}
+    >
+      {editedContent}
+    </pre>
   );
 
   const previewPane = (
@@ -239,16 +286,20 @@ export function MarkdownEditor({
       key="preview"
       ref={previewRef}
       onScroll={handlePreviewScroll}
-      style={
-        viewMode === "both"
-          ? { width: `${(1 - editorRatio) * 100}%` }
-          : undefined
-      }
+      style={previewWidthStyle}
       className={`markdown-body overflow-y-auto px-6 py-8 ${
         viewMode === "preview" ? "w-full" : ""
       }`}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[
+          rehypeRaw,
+          [rehypeSanitize, markdownSanitizeSchema],
+          rehypeKatex,
+        ]}
+        components={components}
+      >
         {previewSource}
       </ReactMarkdown>
     </div>
@@ -260,13 +311,13 @@ export function MarkdownEditor({
       onPointerDown={handleRatioDragStart}
       onPointerMove={handleRatioDragMove}
       onPointerUp={handleRatioDragEnd}
-      className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-neutral-300 dark:hover:bg-neutral-700"
+      className="print:hidden w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-neutral-300 dark:hover:bg-neutral-700"
     />
   );
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
+    <div className="markdown-editor-root flex h-full flex-col">
+      <div className="print:hidden flex shrink-0 flex-wrap items-center gap-3 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
         <button
           type="button"
           onClick={handleSave}
@@ -274,6 +325,14 @@ export function MarkdownEditor({
           className="rounded bg-neutral-900 px-3 py-1 text-sm text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900"
         >
           {isSaving ? "保存中…" : "保存"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="rounded border border-neutral-200 px-3 py-1 text-sm hover:bg-black/5 dark:border-neutral-700 dark:hover:bg-white/10"
+        >
+          PDF出力
         </button>
 
         <button
@@ -354,13 +413,21 @@ export function MarkdownEditor({
         )}
       </div>
 
-      <div ref={splitContainerRef} className="flex min-h-0 flex-1">
-        {viewMode === "edit" && editorPane}
+      <div
+        ref={splitContainerRef}
+        className="markdown-editor-split flex min-h-0 flex-1"
+      >
+        {viewMode === "edit" && (
+          <>
+            {editorPane}
+            {printEditorPane}
+          </>
+        )}
         {viewMode === "preview" && previewPane}
         {viewMode === "both" &&
           (isSwapped
-            ? [previewPane, divider, editorPane]
-            : [editorPane, divider, previewPane])}
+            ? [previewPane, divider, editorPane, printEditorPane]
+            : [editorPane, printEditorPane, divider, previewPane])}
       </div>
     </div>
   );
