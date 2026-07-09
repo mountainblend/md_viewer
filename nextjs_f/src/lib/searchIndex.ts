@@ -42,21 +42,20 @@ export interface SearchResult {
   matchIndex: number;
 }
 
-const FRONTMATTER_PATTERN = /^---\r?\n[\s\S]*?\r?\n---\r?\n/;
 const SNIPPET_RADIUS = 40;
 
+// frontmatterのtags等も検索対象に含めるため、本文検索はfrontmatterを除去せず生テキストのまま行う
 function buildSnippet(content: string, query: string): string | null {
-  const body = content.replace(FRONTMATTER_PATTERN, "");
-  const lowerBody = body.toLowerCase();
+  const lowerBody = content.toLowerCase();
   const lowerQuery = query.toLowerCase();
   const matchAt = lowerBody.indexOf(lowerQuery);
   if (matchAt === -1) return null;
 
   const start = Math.max(0, matchAt - SNIPPET_RADIUS);
-  const end = Math.min(body.length, matchAt + query.length + SNIPPET_RADIUS);
+  const end = Math.min(content.length, matchAt + query.length + SNIPPET_RADIUS);
   const prefix = start > 0 ? "…" : "";
-  const suffix = end < body.length ? "…" : "";
-  const snippet = body.slice(start, end).replace(/\s+/g, " ").trim();
+  const suffix = end < content.length ? "…" : "";
+  const snippet = content.slice(start, end).replace(/\s+/g, " ").trim();
   return `${prefix}${snippet}${suffix}`;
 }
 

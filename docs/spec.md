@@ -23,6 +23,7 @@ app/md-viewer/
 - Mermaid図: `mermaid`（クライアント側で動的import、SVGを描画）
 - 数式: `remark-math` + `rehype-katex` + `katex`
 - 生HTML埋め込み: `rehype-raw` + `rehype-sanitize`（安全なタグ・属性のみ許可）
+- frontmatter解析: `js-yaml`（`tags`抽出用）
 - ローカルファイルアクセス: ブラウザ標準の File System Access API（追加ライブラリなし）
 - フォルダ選択履歴・設定の永続化: 生のIndexedDB API・`localStorage`（追加ライブラリなし）
 
@@ -39,8 +40,8 @@ app/md-viewer/
 | `lib/usePersistedState.ts` | `localStorage`に永続化する汎用state管理フック（サイドバー幅・表示/非表示、表示モード・分割比率・入替・スクロール同期に使用） |
 | `components/FileTree.tsx` | フラットな`{path}[]`からフォルダ階層のツリーを構築・表示。フォルダは初期状態ですべて折りたたみ、クリックで開閉。フォルダ切り替え時は全フォルダを畳んだ状態にリセット |
 | `components/FolderPicker.tsx` | 選択履歴のあるフォルダ一覧＋追加/削除UI。フォルダ未選択時の全画面表示と、サイドバーのドロップダウン表示の2箇所で共用 |
-| `components/SearchPanel.tsx` | 検索ボックス（300msデバウンス）＋検索結果リスト（ファイル名＋本文スニペット、`<mark>`ハイライト）。クエリが空の時は`FileTree`をそのまま表示する |
-| `components/MarkdownEditor.tsx` | 選択中ファイルの閲覧・編集を担当。生テキスト（frontmatter込み）をテキストエリアで保持し、プレビューのみfrontmatterを除去して`react-markdown`で描画（Mermaid・数式・生HTML対応込み）。画像（`img`）はカスタムレンダラーで相対パスを解決し`URL.createObjectURL()`で表示。表示モード（編集/両方/プレビュー）・分割比率・左右入替・スクロール同期・保存（`createWritable()`）・画像添付（`saveAttachment()`→カーソル位置に挿入）・PDF出力（`window.print()`）を持つ。読み込み・保存した本文は`onContentLoaded`コールバックで検索キャッシュにも渡す |
+| `components/SearchPanel.tsx` | 検索ボックス（300msデバウンス）＋検索結果リスト（ファイル名＋本文スニペット、`<mark>`ハイライト）。クエリが空の時は`FileTree`をそのまま表示する。検索語（`query`）は`app/page.tsx`から制御される（タグクリックによる検索と共有するため） |
+| `components/MarkdownEditor.tsx` | 選択中ファイルの閲覧・編集を担当。生テキスト（frontmatter込み）をテキストエリアで保持し、プレビューのみfrontmatterを除去して`react-markdown`で描画（Mermaid・数式・生HTML対応込み）。画像（`img`）はカスタムレンダラーで相対パスを解決し`URL.createObjectURL()`で表示。表示モード（編集/両方/プレビュー）・分割比率・左右入替・スクロール同期・保存（`createWritable()`）・画像添付（`saveAttachment()`→カーソル位置に挿入）・PDF出力（`window.print()`）・frontmatterの`tags`抽出＆バッジ表示を持つ。読み込み・保存した本文は`onContentLoaded`コールバックで検索キャッシュにも渡す |
 | `components/MermaidDiagram.tsx` | フェンスコードブロックが`mermaid`言語の場合に描画される専用コンポーネント。`mermaid`パッケージを動的importし、`mermaid.render()`が返すSVG文字列をコンテナに挿入する |
 | `app/page.tsx` | 全体を統合。初回マウント時にIndexedDBの選択履歴から直近フォルダをサイレントに復元。フォルダ切り替え・検索インデックス作成・ダークモード・サイドバーのリサイズ/表示切替を統括する |
 
@@ -145,13 +146,20 @@ app/md-viewer/
 - プレビュー側（`previewPane`）は通常のHTML要素なのでそのまま印刷に使われる
 - `globals.css`の`@media print`ブロックで、画面用に固定していた`overflow`/`height`を`.markdown-editor-root`・`.markdown-editor-split`・`main`等に対して解除し、印刷時に内容が途切れないようにする
 
-## 18. 既知の制約
+## 18. frontmatterタグ表示・タグ検索連携
+
+- `MarkdownEditor`内の`extractTags()`が、`editedContent`先頭のfrontmatterブロックを`js-yaml`で解析し`tags`フィールドを取り出す。配列（`tags: [foo, bar]`）・カンマ区切り文字列のいずれにも対応し、YAML解析に失敗した場合や`tags`が無い場合は空配列として扱う（例外を投げない）
+- プレビュー本文の先頭（タイトルより前）に`#タグ名`のピル状バッジとして表示する。編集内容の変化に応じて`useMemo`でリアルタイムに再計算される
+- バッジをクリックすると`onTagClick`（`app/page.tsx`から渡される）が呼ばれ、サイドバーの検索ボックスにそのタグ名をセットする。あわせてサイドバーが非表示だった場合は自動的に再表示する
+- 検索ボックスの状態（`query`）は`app/page.tsx`が保持し、`SearchPanel`は制御コンポーネントとして受け取る（タグクリックとサイドバーの検索入力の両方から同じstateを更新できるようにするため）
+
+## 19. 既知の制約
 
 - File System Access APIはパソコン版のChrome・Edge等Chromium系ブラウザのみ対応。Firefox・Safari、およびスマートフォン・タブレット（iOS/Android。Chromeであっても非対応）では「フォルダを選択」ボタンの代わりに非対応の案内を表示する
 - 認証機能は未実装（[要求仕様書 8章](requirements.md#8-スコープ外本アプリで対応しないこと)参照）
 - Obsidianの`[[wikilink]]`記法はプレビューで通常のテキストとして表示される（リンクとしては機能しない）
 - 自動テスト（Playwright等）は未導入。実装時の動作確認はPlaywrightによる手動起動スクリプトで実施した
 
-## 19. 開発・動作確認
+## 20. 開発・動作確認
 
 `nextjs_f/`で`npm run dev`（開発時）または`npm run build`（`output: "export"`による静的ビルド、`out/`に出力）。公開先は Vercel（`https://md-vault-viewer.vercel.app`）。

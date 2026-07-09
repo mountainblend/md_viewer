@@ -1,6 +1,7 @@
 "use client";
 
 import { isValidElement, useEffect, useMemo, useRef, useState } from "react";
+import { load as loadYaml } from "js-yaml";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -17,6 +18,7 @@ import { usePersistedState } from "@/lib/usePersistedState";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 
 const FRONTMATTER_PATTERN = /^---\r?\n[\s\S]*?\r?\n---\r?\n/;
+const FRONTMATTER_CAPTURE_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/;
 
 const EDITOR_RATIO_MIN = 0.2;
 const EDITOR_RATIO_MAX = 0.8;
@@ -31,16 +33,43 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+/** frontmatterのtagsフィールドを取り出す。配列・カンマ区切り文字列いずれにも対応し、解析に失敗した場合は空配列を返す */
+function extractTags(rawContent: string): string[] {
+  const match = FRONTMATTER_CAPTURE_PATTERN.exec(rawContent);
+  if (!match) return [];
+
+  try {
+    const data = loadYaml(match[1]);
+    if (!data || typeof data !== "object") return [];
+    const raw = (data as Record<string, unknown>).tags;
+
+    if (Array.isArray(raw)) {
+      return raw.map((t) => String(t).trim()).filter(Boolean);
+    }
+    if (typeof raw === "string") {
+      return raw
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 interface MarkdownEditorProps {
   rootHandle: FileSystemDirectoryHandle;
   entry: FileEntry;
   onContentLoaded?: (path: string, content: string) => void;
+  onTagClick?: (tag: string) => void;
 }
 
 export function MarkdownEditor({
   rootHandle,
   entry,
   onContentLoaded,
+  onTagClick,
 }: MarkdownEditorProps) {
   const [savedContent, setSavedContent] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState("");
@@ -117,6 +146,8 @@ export function MarkdownEditor({
     () => stripFrontmatter(editedContent),
     [editedContent]
   );
+
+  const tags = useMemo(() => extractTags(editedContent), [editedContent]);
 
   const components = useMemo<Components>(
     () => ({
@@ -291,6 +322,20 @@ export function MarkdownEditor({
         viewMode === "preview" ? "w-full" : ""
       }`}
     >
+      {tags.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {tags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => onTagClick?.(tag)}
+              className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            >
+              #{tag}
+            </button>
+          ))}
+        </div>
+      )}
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[

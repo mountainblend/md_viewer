@@ -11,6 +11,8 @@ interface SearchPanelProps {
   selectedPath: string | null;
   onSelect: (path: string) => void;
   treeFallback: ReactNode;
+  query: string;
+  onQueryChange: (query: string) => void;
 }
 
 function highlightSnippet(snippet: string, query: string): ReactNode {
@@ -34,9 +36,10 @@ export function SearchPanel({
   selectedPath,
   onSelect,
   treeFallback,
+  query,
+  onQueryChange,
 }: SearchPanelProps) {
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 300);
@@ -54,7 +57,7 @@ export function SearchPanel({
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => onQueryChange(e.target.value)}
           placeholder="ファイル名・本文を検索"
           className="w-full rounded border border-neutral-300 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-neutral-500 dark:border-neutral-700"
         />

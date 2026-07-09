@@ -53,6 +53,8 @@ export default function Home() {
   const [isCreatingFileBusy, setIsCreatingFileBusy] = useState(false);
   const newFileInputRef = useRef<HTMLInputElement>(null);
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [isDark, toggleTheme] = useTheme();
   const [sidebarWidth, setSidebarWidth] = usePersistedState(
     "sidebarWidth",
@@ -429,6 +431,8 @@ export default function Home() {
                 indexing={indexing}
                 selectedPath={selectedPath}
                 onSelect={setSelectedPath}
+                query={searchQuery}
+                onQueryChange={setSearchQuery}
                 treeFallback={
                   <FileTree
                     entries={entries}
@@ -465,6 +469,10 @@ export default function Home() {
             rootHandle={rootHandle}
             entry={selectedEntry}
             onContentLoaded={handleContentLoaded}
+            onTagClick={(tag) => {
+              setSidebarHidden(false);
+              setSearchQuery(tag);
+            }}
           />
         ) : (
           <CenteredMessage>
